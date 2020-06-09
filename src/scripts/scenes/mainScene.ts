@@ -17,9 +17,9 @@ export default class MainScene extends Phaser.Scene {
 
         const players: Player[] = [];
         const player1 = new Player(this,400,400, rt);
-        const player2 = new Player(this,400,500, rt, 'agraelus-default');
+        //const player2 = new Player(this,400,500, rt, 'agraelus-default');
 
-        players.push(player1, player2);
+        players.push(player1/*, player2*/);
 
         this.physics.world.on('worldbounds', this.onWorldBounds)
 
@@ -39,7 +39,7 @@ export default class MainScene extends Phaser.Scene {
     onWorldBounds(body: Phaser.Physics.Arcade.Body) {
         var player = body.gameObject;
         if (player instanceof Player){
-            console.log('player', player.texture.key, 'hit wall');
+            player.onBoundsCollision();
         }
     }
 
