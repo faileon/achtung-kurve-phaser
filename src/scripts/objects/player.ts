@@ -3,18 +3,28 @@ import RenderTexture = Phaser.GameObjects.RenderTexture;
 export default class Player extends Phaser.Physics.Arcade.Sprite {
     private readonly rt: Phaser.GameObjects.RenderTexture;
     private readonly trailShape: Phaser.GameObjects.Arc;
+    public readonly headParts: Phaser.Physics.Arcade.StaticGroup;
     public readonly bodyParts: Phaser.Physics.Arcade.StaticGroup;
 
-    private last_point: Phaser.Geom.Point;
+    private shouldDraw = true;
+    private lastPosition: Phaser.Geom.Point;
     private readonly offsetX: number;
     private readonly offsetY: number;
-    private readonly radius = 16;
-    private readonly colliderSpawnOffset = 4;
+    private readonly radius = 10;
+    private readonly colliderSpawnOffset = 6;
     private readonly turnSpeed = 200;
-    private speed = 125;
-
-    private holeSize = 250;
-    private spawnedFirstCollider = false;
+    private readonly speed = 125;
+    private isFirstColliderSpawned = false;
+    private readonly holeConfig = {
+        every: {
+            from: 2,
+            to: 4
+        },
+        size: {
+            from: 50,
+            to: 100
+        }
+    }
 
 
     constructor(scene: Phaser.Scene, x: number, y: number, rt: RenderTexture, texture: string = 'herdyn-default') {
@@ -31,30 +41,47 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.setCollideWorldBounds(true);
         (this.body as Phaser.Physics.Arcade.Body).onWorldBounds = true;
-        this.scene.physics.world.on('worldbounds', this.onBoundsCollision, this); // todo maybe this in scene or rework this
-
 
         scene.events.on('update', this.update, this);
 
 
         const color = new Phaser.Display.Color().random().color;
         this.trailShape = scene.add.circle(x, y, this.radius, color).setVisible(false);
+        this.headParts = scene.physics.add.staticGroup();
         this.bodyParts = scene.physics.add.staticGroup();
 
 
-        this.last_point = new Phaser.Geom.Point(x, y);
+        this.lastPosition = new Phaser.Geom.Point(x, y);
 
         scene.physics.add.overlap(this, this.bodyParts, (object1, object2) => {
-            const index = this.bodyParts.getChildren().findIndex(bp => bp === object2);
-            if (index < this.bodyParts.getLength() - this.radius/this.colliderSpawnOffset*2) {
-                console.log('bit self');
-            }
+            console.log(this.texture.key, 'bit self', this.headParts.getLength(), this.bodyParts.getLength());
         });
+
+        this.startHoleSpawning();
     }
 
-    private toggleDraw = true;
+
+    private startHoleSpawning() {
+        const spawnAt = Phaser.Math.FloatBetween(this.holeConfig.every.from, this.holeConfig.every.to);
+        //console.log(`Will start hole after ${spawnAt}s`)
+        setTimeout(() => {
+
+            this.shouldDraw = false;
+            const holeSize = Phaser.Math.Between(this.holeConfig.size.from, this.holeConfig.size.to);
+            const holeTime = distanceToDuration(holeSize, this.speed);
+
+            //console.log(`Started hole ${holeSize}px large. Will end hole in ${holeTime}s`);
+            setTimeout(() => {
+                //console.log('Ended hole.');
+                this.shouldDraw = true;
+                this.startHoleSpawning();
+            }, holeTime * 1000)
+
+        }, spawnAt * 1000);
+    }
 
     update(): void {
+        // todo input manager
         const cursorKeys = this.scene.input.keyboard.createCursorKeys();
         if (cursorKeys.left?.isDown) {
             this.setAngularVelocity(-this.turnSpeed);
@@ -64,28 +91,31 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             this.setAngularVelocity(0);
         }
 
-        this.toggleDraw = !cursorKeys.space?.isDown;
-
+        // calculate correct velocity from speed and angle
         const velocity = this.scene.physics.velocityFromAngle(this.angle, this.speed);
         this.setVelocity(velocity.x, velocity.y);
 
 
-        const distance = Phaser.Math.Distance.Between(this.last_point.x, this.last_point.y, this.x, this.y)
-        if (distance > this.colliderSpawnOffset && this.toggleDraw) {
-            const go: Phaser.GameObjects.GameObject = this.bodyParts.create(this.x + this.offsetX + 1, this.y + this.offsetY + 1)
+        // draw colliders and texture on cavas
+        const distance = Phaser.Math.Distance.Between(this.lastPosition.x, this.lastPosition.y, this.x, this.y)
+        const shouldDrawColliders = distance > this.colliderSpawnOffset && this.shouldDraw;
+        if (shouldDrawColliders) {
+            this.headParts.create(this.x + this.offsetX + 1, this.y + this.offsetY + 1)
                 .setVisible(false)
                 .setCircle(this.radius);
-/*            setTimeout(() => {
-                go.setActive(true);
-            }, 500);*/
-            this.last_point.x = this.x;
-            this.last_point.y = this.y;
-            // this.spawnedFirstCollider = true;
+            this.lastPosition.x = this.x;
+            this.lastPosition.y = this.y;
             this.rt.draw(this.trailShape, this.x, this.y);
         }
 
 
-        //this.rt.draw(this.trailShape, this.x, this.y);
+        // dump headparts to body parts after headparts get too long (past neck) - to prevent self bite as the colliders spawn
+        const headSize = (this.radius / this.colliderSpawnOffset * 2)+1;
+        if (this.headParts.getLength() > headSize) {
+            const lastPart = this.headParts.getChildren()[0];
+            this.headParts.remove(lastPart);
+            this.bodyParts.add(lastPart);
+        }
 
 
     }
@@ -95,5 +125,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         console.log('player', this.texture.key, 'hit wall');
     }
 
+    public onCrash(otherObject: Phaser.GameObjects.GameObject) {
+        console.log('player', this.texture?.key, 'crashed');
+    }
+
 
 }
+
+
+const distanceToDuration = (distance: number, velocity: number) => (distance/velocity)
