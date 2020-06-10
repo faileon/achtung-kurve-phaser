@@ -6,12 +6,19 @@ export default class PreloadScene extends Phaser.Scene {
   preload() {
     // todo preload dynamically per folder structure
     this.load.image('herdyn-default', 'assets/img/heroes/herdyn/0.png');
+    this.load.image('herdyn-default-dead', 'assets/img/heroes/herdyn/00.png');
+
     this.load.image('agraelus-default', 'assets/img/heroes/agraelus/0.png');
-    this.load.image('wall', 'assets/img/wall.png');
+    this.load.image('agraelus-default-dead', 'assets/img/heroes/agraelus/00.png');
+
+    this.load.spritesheet('explosion', 'assets/img/explosion.png', {
+      frameWidth: 28,
+      frameHeight: 28
+    });
   }
 
   create() {
-    this.scene.start('MainScene')
+    this.scene.start('MainScene');
 
     /**
      * This is how you would dynamically import the mainScene class (with code splitting),
